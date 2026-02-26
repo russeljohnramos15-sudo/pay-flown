@@ -9,12 +9,13 @@ import { AlertCircle, Loader2, Phone, User, Lock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { v4 as uuidv4 } from 'crypto'
 
 export default function SignUpPage() {
+  const [step, setStep] = useState<'info' | 'verify'>('info')
   const [phone, setPhone] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -28,19 +29,20 @@ export default function SignUpPage() {
     try {
       if (!phone || !displayName || !password) {
         setError('Please fill in all fields')
+        setLoading(false)
         return
       }
 
       if (password.length < 6) {
         setError('Password must be at least 6 characters')
+        setLoading(false)
         return
       }
 
-      // Create unique email using phone number (replace leading 0 with country code)
-      const uniqueId = Math.random().toString(36).substring(2, 9)
-      const email = `user${uniqueId}@payflown.local`
+      // Create account with email and password
+      const randomId = Math.random().toString(36).substring(2, 10)
+      const email = `user_${randomId}@payflown.local`
 
-      // Sign up with email/password
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -53,37 +55,25 @@ export default function SignUpPage() {
       })
 
       if (signUpError) throw signUpError
-      if (!data.user) throw new Error('Signup failed')
 
-      // Create profile with phone number
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
+      if (data.user) {
+        // Create profile
+        await supabase.from('profiles').insert({
           id: data.user.id,
-          phone_number: phone,
           display_name: displayName,
+          phone_number: phone,
         })
 
-      if (profileError) {
-        console.error('Profile error:', profileError)
-        // Continue anyway - profile might already exist
-      }
-
-      // Create wallet
-      const { error: walletError } = await supabase
-        .from('wallets')
-        .insert({
+        // Create wallet
+        await supabase.from('wallets').insert({
           user_id: data.user.id,
           balance: 0,
           currency: 'PHP',
         })
 
-      if (walletError) {
-        console.error('Wallet error:', walletError)
+        toast.success('Account created successfully!')
+        router.push('/auth/login')
       }
-
-      toast.success('Account created! Please sign in.')
-      router.push('/auth/login')
     } catch (err: any) {
       const message = err.message || 'Failed to create account'
       setError(message)
@@ -102,7 +92,7 @@ export default function SignUpPage() {
             <p className="text-gray-600 mt-2">Create Your Wallet</p>
           </div>
 
-          <form onSubmit={handleSignUp} className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-6">
             {error && (
               <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -110,7 +100,7 @@ export default function SignUpPage() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 <User className="inline-block mr-2 h-4 w-4" />
                 Full Name
@@ -125,7 +115,7 @@ export default function SignUpPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 <Phone className="inline-block mr-2 h-4 w-4" />
                 Phone Number
@@ -140,14 +130,14 @@ export default function SignUpPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 <Lock className="inline-block mr-2 h-4 w-4" />
                 Password (6+ chars)
               </label>
               <Input
                 type="password"
-                placeholder="••••••••••••"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
@@ -164,7 +154,7 @@ export default function SignUpPage() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
+                  Creating Account...
                 </>
               ) : (
                 'Sign Up'

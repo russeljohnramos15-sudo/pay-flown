@@ -25,48 +25,44 @@ export default function LoginPage() {
 
     try {
       if (!phone || !password) {
-        setError('Please enter phone and password')
+        setError('Please enter phone number and password')
+        setLoading(false)
         return
       }
 
       // Find user by phone number
-      const { data: profiles, error: searchError } = await supabase
+      const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('phone_number', phone)
         .single()
 
-      if (searchError || !profiles) {
+      if (profileError || !profiles) {
         setError('Phone number not found')
+        setLoading(false)
         return
       }
 
-      // Get the user's email from auth
-      const { data: { users }, error: usersError } = await supabase.admin.auth.listUsers()
-      
-      if (usersError || !users) {
-        setError('Authentication error')
+      // Get user's email from auth
+      const { data: users, error: usersError } = await supabase.auth.admin.listUsers()
+      const user = users?.users.find((u) => u.user_metadata?.phone_number === phone)
+
+      if (!user || usersError) {
+        setError('User not found')
+        setLoading(false)
         return
       }
 
-      const user = users.find(u => u.id === profiles.id)
-      if (!user || !user.email) {
-        setError('User account error')
-        return
-      }
-
-      // Sign in with email/password
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
+      // Sign in with email and password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email || '',
         password,
       })
 
       if (signInError) throw signInError
 
-      if (data.user) {
-        toast.success('Login successful!')
-        router.push('/dashboard')
-      }
+      toast.success('Login successful!')
+      router.push('/dashboard')
     } catch (err: any) {
       const message = err.message || 'Failed to login'
       setError(message)
@@ -82,10 +78,10 @@ export default function LoginPage() {
         <div className="p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">PayFlown</h1>
-            <p className="text-gray-600 mt-2">Digital Wallet Login</p>
+            <p className="text-gray-600 mt-2">Sign In to Your Wallet</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-6">
             {error && (
               <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -93,7 +89,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 <Phone className="inline-block mr-2 h-4 w-4" />
                 Phone Number
@@ -108,14 +104,14 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 <Lock className="inline-block mr-2 h-4 w-4" />
                 Password
               </label>
               <Input
                 type="password"
-                placeholder="••••••••••••"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
@@ -140,13 +136,20 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm">
-              Don't have an account?{' '}
-              <Link href="/auth/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-                Sign up
+          <div className="mt-6 space-y-3 text-center text-sm">
+            <div>
+              <Link href="/auth/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium">
+                Forgot Password?
               </Link>
-            </p>
+            </div>
+            <div>
+              <p className="text-gray-600">
+                Don't have an account?{' '}
+                <Link href="/auth/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Sign up
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </Card>
