@@ -10,12 +10,27 @@ export default function Home() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session?.user) {
-        router.push('/dashboard')
-      } else {
+      try {
+        const supabase = createClient()
+        
+        // Check if user is authenticated
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Auth error:', error)
+          // If there's an error checking auth, redirect to login
+          router.push('/auth/login')
+          return
+        }
+        
+        if (session?.user) {
+          router.push('/dashboard')
+        } else {
+          router.push('/auth/login')
+        }
+      } catch (err) {
+        console.error('Navigation error:', err)
+        // On error, default to login page
         router.push('/auth/login')
       }
     }
