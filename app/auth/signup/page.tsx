@@ -5,10 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import { AlertCircle, Loader2, Phone, User } from 'lucide-react'
+import { AlertCircle, Loader2, Phone, User, Lock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { v4 as uuidv4 } from 'crypto'
 
 export default function SignUpPage() {
   const [phone, setPhone] = useState('')
@@ -26,20 +27,29 @@ export default function SignUpPage() {
 
     try {
       if (!phone || !displayName || !password) {
-        throw new Error('Please fill in all fields')
+        setError('Please fill in all fields')
+        return
       }
 
       if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters')
+        setError('Password must be at least 6 characters')
+        return
       }
 
-      // Create email from phone for authentication
-      const email = `${phone}@payflown.local`
+      // Create unique email using phone number (replace leading 0 with country code)
+      const uniqueId = Math.random().toString(36).substring(2, 9)
+      const email = `user${uniqueId}@payflown.local`
 
       // Sign up with email/password
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            phone_number: phone,
+            display_name: displayName,
+          },
+        },
       })
 
       if (signUpError) throw signUpError
@@ -50,11 +60,14 @@ export default function SignUpPage() {
         .from('profiles')
         .insert({
           id: data.user.id,
-          display_name: displayName,
           phone_number: phone,
+          display_name: displayName,
         })
 
-      if (profileError) console.warn('Profile creation warning:', profileError)
+      if (profileError) {
+        console.error('Profile error:', profileError)
+        // Continue anyway - profile might already exist
+      }
 
       // Create wallet
       const { error: walletError } = await supabase
@@ -65,12 +78,14 @@ export default function SignUpPage() {
           currency: 'PHP',
         })
 
-      if (walletError) console.warn('Wallet creation warning:', walletError)
+      if (walletError) {
+        console.error('Wallet error:', walletError)
+      }
 
-      toast.success('Account created! You can now log in.')
+      toast.success('Account created! Please sign in.')
       router.push('/auth/login')
     } catch (err: any) {
-      const message = err.message || 'Failed to sign up'
+      const message = err.message || 'Failed to create account'
       setError(message)
       toast.error(message)
     } finally {
@@ -87,27 +102,13 @@ export default function SignUpPage() {
             <p className="text-gray-600 mt-2">Create Your Wallet</p>
           </div>
 
-          <form onSubmit={handleSignUp} className="space-y-6">
+          <form onSubmit={handleSignUp} className="space-y-4">
             {error && (
               <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                <Phone className="inline-block mr-2 h-4 w-4" />
-                Phone Number
-              </label>
-              <Input
-                type="tel"
-                placeholder="+63912345678"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={loading}
-              />
-            </div>
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
@@ -120,32 +121,50 @@ export default function SignUpPage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 disabled={loading}
+                required
               />
             </div>
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
+                <Phone className="inline-block mr-2 h-4 w-4" />
+                Phone Number
+              </label>
+              <Input
+                type="tel"
+                placeholder="09XXXXXXXXX"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                <Lock className="inline-block mr-2 h-4 w-4" />
                 Password (6+ chars)
               </label>
               <Input
                 type="password"
-                placeholder="••••••••"
+                placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
+                required
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               size="lg"
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
+                  Creating account...
                 </>
               ) : (
                 'Sign Up'
