@@ -5,13 +5,13 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import { AlertCircle, Loader2, Mail, Lock } from 'lucide-react'
+import { AlertCircle, Loader2, Phone } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,24 +24,24 @@ export default function LoginPage() {
     setError('')
 
     try {
-      if (!email || !password) {
-        setError('Please enter both email and password')
-        return
+      if (!phone || !password) {
+        throw new Error('Please enter phone and password')
       }
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      // Use phone as email
+      const email = `${phone}@payflown.local`
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (signInError) throw signInError
 
-      if (data.user) {
-        toast.success('Login successful!')
-        router.push('/dashboard')
-      }
+      toast.success('Login successful!')
+      router.push('/dashboard')
     } catch (err: any) {
-      const message = err.message || 'Failed to login'
+      const message = err.message || 'Login failed'
       setError(message)
       toast.error(message)
     } finally {
@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div className="p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">PayFlown</h1>
-            <p className="text-gray-600 mt-2">Digital Wallet Login</p>
+            <p className="text-gray-600 mt-2">Sign In To Your Wallet</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
@@ -66,24 +66,22 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
-                <Mail className="inline-block mr-2 h-4 w-4" />
-                Email Address
+                <Phone className="inline-block mr-2 h-4 w-4" />
+                Phone Number
               </label>
               <Input
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="tel"
+                placeholder="+63912345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 disabled={loading}
-                required
               />
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
-                <Lock className="inline-block mr-2 h-4 w-4" />
                 Password
               </label>
               <Input
@@ -92,14 +90,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                required
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full bg-blue-600 hover:bg-blue-700"
               size="lg"
             >
               {loading ? (
