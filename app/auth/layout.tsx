@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Auth - PayFlow',
+  title: 'Auth - PayFlown',
   description: 'Sign in or create an account',
 }
 

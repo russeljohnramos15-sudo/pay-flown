@@ -21,7 +21,7 @@ export function DashboardNav() {
     <nav className="w-full md:w-64 bg-gray-900 text-white fixed bottom-0 md:static md:border-r md:border-gray-200 z-40">
       <div className="hidden md:flex flex-col h-screen">
         <div className="p-6 border-b border-gray-700">
-          <h1 className="text-2xl font-bold">PayFlow</h1>
+          <h1 className="text-2xl font-bold">PayFlown</h1>
         </div>
         <div className="flex-1 overflow-auto">
           <div className="space-y-2 p-4">

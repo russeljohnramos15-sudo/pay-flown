@@ -1,4 +1,4 @@
-# PayFlow - Digital Wallet App
+# PayFlown - Digital Wallet App
 
 A full-featured digital wallet application similar to GCash, built with Next.js, Supabase, and TypeScript.
 

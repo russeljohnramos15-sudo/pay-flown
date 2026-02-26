@@ -54,7 +54,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <div className="p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">PayFlow</h1>
+            <h1 className="text-3xl font-bold text-gray-900">PayFlown</h1>
             <p className="text-gray-600 mt-2">Digital Wallet Login</p>
           </div>
 
