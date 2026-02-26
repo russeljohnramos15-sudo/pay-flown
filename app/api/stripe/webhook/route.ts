@@ -1,5 +1,5 @@
 import { stripe } from '@/lib/stripe'
-import { getServerClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as any
 
-      const serverClient = getServerClient()
+      const supabase = await createClient()
 
       // Get user ID from metadata
       const userId = session.metadata?.userId
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Get wallet
-      const { data: wallet } = await serverClient
+      const { data: wallet } = await supabase
         .from('wallets')
         .select('*')
         .eq('user_id', userId)
@@ -44,13 +44,13 @@ export async function POST(req: NextRequest) {
       const amount = session.amount_total / 100
 
       // Update wallet balance
-      await serverClient
+      await supabase
         .from('wallets')
         .update({ balance: wallet.balance + amount })
         .eq('id', wallet.id)
 
       // Create transaction record
-      await serverClient
+      await supabase
         .from('transactions')
         .insert({
           wallet_id: wallet.id,

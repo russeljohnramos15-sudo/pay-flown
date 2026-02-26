@@ -37,7 +37,7 @@ export default function DashboardPage() {
             balance={wallet.balance}
             currency={wallet.currency}
             phone={profile.phone_number}
-            userName={profile.full_name}
+            userName={profile.display_name}
           />
         )}
       </div>

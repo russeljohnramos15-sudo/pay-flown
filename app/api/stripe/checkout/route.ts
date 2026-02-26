@@ -1,24 +1,22 @@
 import { createCheckoutSession } from '@/lib/stripe'
-import { supabase } from '@/lib/supabase'
-import { topUpSchema } from '@/lib/validators'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const validatedData = topUpSchema.parse(body)
+    const { amount } = body
 
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
+    if (!amount || amount < 1) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Invalid amount' },
+        { status: 400 }
       )
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const supabase = await createClient()
+    
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
 
     if (userError || !user) {
       return NextResponse.json(
@@ -31,7 +29,7 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single()
 
     if (!profile) {
@@ -43,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     const session = await createCheckoutSession(
       user.id,
-      validatedData.amount,
+      amount,
       user.email || `${profile.phone_number}@wallet.local`
     )
 
