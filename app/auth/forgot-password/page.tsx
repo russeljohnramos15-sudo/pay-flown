@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import { AlertCircle, Loader2, Phone, Lock } from 'lucide-react'
+import { AlertCircle, Loader2, Phone, Lock, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -26,34 +27,15 @@ export default function ForgotPasswordPage() {
     setError('')
 
     try {
-      if (!phone) {
-        setError('Please enter your phone number')
-        setLoading(false)
-        return
-      }
+      if (!phone) throw new Error('Please enter your phone number')
 
-      // Verify phone exists
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('phone_number', phone)
-        .single()
-
-      if (profileError || !profile) {
-        setError('Phone number not found')
-        setLoading(false)
-        return
-      }
-
-      // Generate OTP (in real app, send via SMS)
-      const generatedOtp = Math.random().toString().substring(2, 8)
-      localStorage.setItem('resetOtp', generatedOtp)
-      localStorage.setItem('resetPhone', phone)
-
-      toast.success(`OTP: ${generatedOtp} (for demo purposes)`)
+      // For demo, OTP is shown in toast
+      const demoOTP = '123456'
+      toast.info(`Demo OTP: ${demoOTP}`)
+      setOtp('')
       setStep('otp')
     } catch (err: any) {
-      setError(err.message || 'Failed to send OTP')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -65,16 +47,10 @@ export default function ForgotPasswordPage() {
     setError('')
 
     try {
-      const storedOtp = localStorage.getItem('resetOtp')
-      if (otp !== storedOtp) {
-        setError('Invalid OTP')
-        setLoading(false)
-        return
-      }
-
+      if (otp !== '123456') throw new Error('Invalid OTP')
       setStep('reset')
     } catch (err: any) {
-      setError(err.message || 'Failed to verify OTP')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -86,47 +62,22 @@ export default function ForgotPasswordPage() {
     setError('')
 
     try {
-      if (!newPassword || newPassword.length < 6) {
-        setError('Password must be at least 6 characters')
-        setLoading(false)
-        return
-      }
+      if (!newPassword || !confirmPassword) throw new Error('Please fill in all fields')
+      if (newPassword !== confirmPassword) throw new Error('Passwords do not match')
+      if (newPassword.length < 6) throw new Error('Password must be 6+ characters')
 
-      const resetPhone = localStorage.getItem('resetPhone')
-      if (!resetPhone) {
-        setError('Session expired. Please start over.')
-        setLoading(false)
-        return
-      }
+      const email = `${phone}@payflown.local`
 
-      // Find user by phone
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('phone_number', resetPhone)
-        .single()
-
-      if (profileError || !profiles) {
-        setError('User not found')
-        setLoading(false)
-        return
-      }
-
-      // Update password via Supabase admin (client-side would need RLS bypass)
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       })
 
       if (updateError) throw updateError
 
-      // Clear stored values
-      localStorage.removeItem('resetOtp')
-      localStorage.removeItem('resetPhone')
-
       toast.success('Password reset successfully!')
       router.push('/auth/login')
     } catch (err: any) {
-      setError(err.message || 'Failed to reset password')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -138,19 +89,19 @@ export default function ForgotPasswordPage() {
         <div className="p-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">PayFlown</h1>
-            <p className="text-gray-600 mt-2">Reset Your Password</p>
+            <p className="text-gray-600 mt-2">Reset Password</p>
           </div>
 
-          {step === 'phone' && (
-            <form onSubmit={handleSendOTP} className="space-y-6">
-              {error && (
-                <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              )}
+          {error && (
+            <div className="flex gap-3 p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
 
-              <div className="space-y-3">
+          {step === 'phone' && (
+            <form onSubmit={handleSendOTP} className="space-y-4">
+              <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   <Phone className="inline-block mr-2 h-4 w-4" />
                   Phone Number
@@ -161,83 +112,40 @@ export default function ForgotPasswordPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   disabled={loading}
-                  required
                 />
               </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending OTP...
-                  </>
-                ) : (
-                  'Send OTP'
-                )}
+              <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700" size="lg">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                Send OTP
               </Button>
             </form>
           )}
 
           {step === 'otp' && (
-            <form onSubmit={handleVerifyOTP} className="space-y-6">
-              {error && (
-                <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">
-                  Enter OTP Code
-                </label>
+            <form onSubmit={handleVerifyOTP} className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Enter OTP</label>
                 <Input
                   type="text"
-                  placeholder="000000"
+                  placeholder="123456"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
                   disabled={loading}
-                  required
                 />
-                <p className="text-xs text-gray-500">Check the toast notification for OTP</p>
               </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  'Verify OTP'
-                )}
+              <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700" size="lg">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                Verify
               </Button>
             </form>
           )}
 
           {step === 'reset' && (
-            <form onSubmit={handleResetPassword} className="space-y-6">
-              {error && (
-                <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
-              )}
-
-              <div className="space-y-3">
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   <Lock className="inline-block mr-2 h-4 w-4" />
-                  New Password (6+ chars)
+                  New Password
                 </label>
                 <Input
                   type="password"
@@ -245,30 +153,32 @@ export default function ForgotPasswordPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   disabled={loading}
-                  required
                 />
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Resetting...
-                  </>
-                ) : (
-                  'Reset Password'
-                )}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  <Lock className="inline-block mr-2 h-4 w-4" />
+                  Confirm Password
+                </label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700" size="lg">
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                Reset Password
               </Button>
             </form>
           )}
 
           <div className="mt-6 text-center">
-            <Link href="/auth/login" className="text-blue-600 hover:text-blue-700 font-medium text-sm">
+            <Link href="/auth/login" className="text-blue-600 hover:underline text-sm">
               Back to Login
             </Link>
           </div>

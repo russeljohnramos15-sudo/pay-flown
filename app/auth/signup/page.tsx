@@ -11,11 +11,9 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 
 export default function SignUpPage() {
-  const [step, setStep] = useState<'info' | 'verify'>('info')
   const [phone, setPhone] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
-  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -28,54 +26,53 @@ export default function SignUpPage() {
 
     try {
       if (!phone || !displayName || !password) {
-        setError('Please fill in all fields')
-        setLoading(false)
-        return
+        throw new Error('Please fill in all fields')
       }
 
       if (password.length < 6) {
-        setError('Password must be at least 6 characters')
-        setLoading(false)
-        return
+        throw new Error('Password must be at least 6 characters')
       }
 
-      // Create account with email and password
-      const randomId = Math.random().toString(36).substring(2, 10)
-      const email = `user_${randomId}@payflown.local`
+      // Use phone as unique email
+      const email = `${phone}@payflown.local`
 
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            phone_number: phone,
-            display_name: displayName,
-          },
-        },
       })
 
       if (signUpError) throw signUpError
 
       if (data.user) {
         // Create profile
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          display_name: displayName,
-          phone_number: phone,
-        })
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            phone_number: phone,
+            display_name: displayName,
+          })
+
+        if (profileError && !profileError.message.includes('duplicate')) {
+          console.error('Profile error:', profileError)
+        }
 
         // Create wallet
-        await supabase.from('wallets').insert({
-          user_id: data.user.id,
-          balance: 0,
-          currency: 'PHP',
-        })
+        const { error: walletError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: data.user.id,
+            balance: 0,
+            currency: 'PHP',
+          })
 
-        toast.success('Account created successfully!')
+        if (walletError) console.error('Wallet error:', walletError)
+
+        toast.success('Account created! Sign in with your phone number.')
         router.push('/auth/login')
       }
     } catch (err: any) {
-      const message = err.message || 'Failed to create account'
+      const message = err.message || 'Signup failed'
       setError(message)
       toast.error(message)
     } finally {
@@ -92,7 +89,7 @@ export default function SignUpPage() {
             <p className="text-gray-600 mt-2">Create Your Wallet</p>
           </div>
 
-          <form onSubmit={handleSignUp} className="space-y-6">
+          <form onSubmit={handleSignUp} className="space-y-4">
             {error && (
               <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -100,22 +97,7 @@ export default function SignUpPage() {
               </div>
             )}
 
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
-                <User className="inline-block mr-2 h-4 w-4" />
-                Full Name
-              </label>
-              <Input
-                type="text"
-                placeholder="Juan Dela Cruz"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={loading}
-                required
-              />
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 <Phone className="inline-block mr-2 h-4 w-4" />
                 Phone Number
@@ -126,14 +108,27 @@ export default function SignUpPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={loading}
-                required
               />
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                <User className="inline-block mr-2 h-4 w-4" />
+                Full Name
+              </label>
+              <Input
+                type="text"
+                placeholder="Juan Dela Cruz"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 <Lock className="inline-block mr-2 h-4 w-4" />
-                Password (6+ chars)
+                Password
               </label>
               <Input
                 type="password"
@@ -141,20 +136,19 @@ export default function SignUpPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                required
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full bg-blue-600 hover:bg-blue-700"
               size="lg"
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
+                  Creating...
                 </>
               ) : (
                 'Sign Up'
@@ -164,9 +158,9 @@ export default function SignUpPage() {
 
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
-              Already have an account?{' '}
-              <Link href="/auth/login" className="text-blue-600 hover:text-blue-700 font-medium">
-                Sign in
+              Already have account?{' '}
+              <Link href="/auth/login" className="text-blue-600 hover:underline font-medium">
+                Sign In
               </Link>
             </p>
           </div>
