@@ -2,25 +2,29 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/useAuth'
+import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 
 export default function Home() {
-  const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.user) {
         router.push('/dashboard')
       } else {
-        router.push('/login')
+        router.push('/auth/login')
       }
     }
-  }, [user, loading, router])
+
+    checkAuth()
+  }, [router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-white">
       <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
     </div>
   )
