@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    const supabase = await createClient()
 
     const { data: profile, error } = await supabase
       .from('profiles')

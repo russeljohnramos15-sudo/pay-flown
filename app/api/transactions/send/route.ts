@@ -1,27 +1,15 @@
-import { supabase, getServerClient } from '@/lib/supabase'
-import { sendMoneySchema } from '@/lib/validators'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const validatedData = sendMoneySchema.parse(body)
+    const { recipientPhone, amount, message } = body
 
-    const serverClient = getServerClient()
+    const supabase = await createClient()
     
-    // Get current user from auth header
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Get sender's user ID from Supabase auth
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
 
     if (userError || !user) {
       return NextResponse.json(
@@ -31,10 +19,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Find recipient by phone number
-    const { data: recipientProfile, error: recipientError } = await serverClient
+    const { data: recipientProfile, error: recipientError } = await supabase
       .from('profiles')
-      .select('*')
-      .eq('phone_number', validatedData.recipientPhone)
+      .select('id')
+      .eq('phone_number', recipientPhone)
       .single()
 
     if (recipientError || !recipientProfile) {
@@ -45,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get sender's wallet
-    const { data: senderWallet, error: senderWalletError } = await serverClient
+    const { data: senderWallet, error: senderWalletError } = await supabase
       .from('wallets')
       .select('*')
       .eq('user_id', user.id)
@@ -59,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check balance
-    if (senderWallet.balance < validatedData.amount) {
+    if (senderWallet.balance < amount) {
       return NextResponse.json(
         { error: 'Insufficient balance' },
         { status: 400 }
@@ -67,10 +55,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Get recipient's wallet
-    const { data: recipientWallet, error: recipientWalletError } = await serverClient
+    const { data: recipientWallet, error: recipientWalletError } = await supabase
       .from('wallets')
       .select('*')
-      .eq('user_id', recipientProfile.user_id)
+      .eq('user_id', recipientProfile.id)
       .single()
 
     if (recipientWalletError || !recipientWallet) {
@@ -81,18 +69,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Create transaction record
-    const { data: transaction, error: transactionError } = await serverClient
+    const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
         wallet_id: senderWallet.id,
-        type: 'send',
-        amount: validatedData.amount,
-        recipient_id: recipientProfile.user_id,
-        description: validatedData.message,
+        from_user_id: user.id,
+        to_user_id: recipientProfile.id,
+        type: 'transfer_out',
+        amount,
+        description: message,
         status: 'completed',
       })
-      .select()
-      .single()
 
     if (transactionError) {
       return NextResponse.json(
@@ -102,31 +89,31 @@ export async function POST(req: NextRequest) {
     }
 
     // Create receive transaction for recipient
-    await serverClient
+    await supabase
       .from('transactions')
       .insert({
         wallet_id: recipientWallet.id,
-        type: 'receive',
-        amount: validatedData.amount,
-        recipient_id: user.id,
-        description: validatedData.message,
+        from_user_id: user.id,
+        to_user_id: recipientProfile.id,
+        type: 'transfer_in',
+        amount,
+        description: message,
         status: 'completed',
       })
 
     // Update balances
-    await serverClient
+    await supabase
       .from('wallets')
-      .update({ balance: senderWallet.balance - validatedData.amount })
+      .update({ balance: senderWallet.balance - amount })
       .eq('id', senderWallet.id)
 
-    await serverClient
+    await supabase
       .from('wallets')
-      .update({ balance: recipientWallet.balance + validatedData.amount })
+      .update({ balance: recipientWallet.balance + amount })
       .eq('id', recipientWallet.id)
 
     return NextResponse.json({
       success: true,
-      transaction,
       message: 'Money sent successfully',
     })
   } catch (error) {

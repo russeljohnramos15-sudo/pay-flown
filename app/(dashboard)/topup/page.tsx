@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -16,6 +16,7 @@ export default function TopUpPage() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { wallet, fetchWallet } = useWallet()
+  const supabase = createClient()
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)

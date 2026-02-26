@@ -1,17 +1,16 @@
-import { getServerClient } from '@/lib/supabase'
-import { requestMoneySchema } from '@/lib/validators'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const validatedData = requestMoneySchema.parse(body)
+    const { recipientPhone, amount, reason } = body
 
-    const serverClient = getServerClient()
+    const supabase = await createClient()
 
-    // Get current user from headers
-    const userId = req.headers.get('x-user-id')
-    if (!userId) {
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -19,10 +18,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Find recipient by phone number
-    const { data: recipientProfile } = await serverClient
+    const { data: recipientProfile } = await supabase
       .from('profiles')
-      .select('*')
-      .eq('phone_number', validatedData.recipientPhone)
+      .select('id')
+      .eq('phone_number', recipientPhone)
       .single()
 
     if (!recipientProfile) {
@@ -33,18 +32,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Create payment request
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiry
-
-    const { data: paymentRequest, error } = await serverClient
+    const { data: paymentRequest, error } = await supabase
       .from('payment_requests')
       .insert({
-        requester_id: userId,
-        recipient_id: recipientProfile.user_id,
-        amount: validatedData.amount,
-        message: validatedData.message,
+        from_user_id: recipientProfile.id,
+        to_user_id: user.id,
+        amount,
+        reason,
         status: 'pending',
-        expires_at: expiresAt.toISOString(),
       })
       .select()
       .single()
